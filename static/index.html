@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>大航海素材工具</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f2f5; color: #333; font-size: 14px; }
+  .container { max-width: 960px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 20px; color: #1a1a2e; margin-bottom: 20px; }
+  .card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .card-title { font-size: 15px; font-weight: 600; color: #333; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; }
+  .form-row { display: flex; align-items: center; margin-bottom: 12px; }
+  .form-label { width: 180px; flex-shrink: 0; color: #555; text-align: right; padding-right: 12px; }
+  .form-label.required::before { content: "* "; color: #ff4d4f; }
+  .form-control { max-width: 400px; width: 100%; height: 32px; padding: 4px 11px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 14px; outline: none; transition: border-color .2s; }
+  .form-control:focus { border-color: #1677ff; box-shadow: 0 0 0 2px rgba(22,119,255,.1); }
+  textarea.form-control { height: 60px; resize: vertical; }
+  select.form-control { cursor: pointer; background: #fff; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 16px; border-radius: 6px; font-size: 14px; cursor: pointer; border: 1px solid transparent; transition: all .2s; outline: none; }
+  .btn-primary { background: #1677ff; color: #fff; border-color: #1677ff; }
+  .btn-primary:hover { background: #4096ff; border-color: #4096ff; }
+  .btn-primary:disabled { background: #bbd8ff; border-color: #bbd8ff; cursor: not-allowed; }
+  .btn-default { background: #fff; color: #333; border-color: #d9d9d9; }
+  .btn-default:hover { border-color: #1677ff; color: #1677ff; }
+  .btn-success { background: #52c41a; color: #fff; border-color: #52c41a; }
+  .btn-success:hover { background: #73d13d; }
+  .btn-success:disabled { background: #b7eb8f; border-color: #b7eb8f; cursor: not-allowed; }
+  .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.5); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hint { color: #999; font-size: 12px; margin-left: 12px; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+  .tag-success { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
+  .tag-error { background: #fff2f0; color: #ff4d4f; border: 1px solid #ffccc7; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table th { background: #fafafa; padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid #f0f0f0; color: #666; }
+  table td { padding: 10px 12px; border-bottom: 1px solid #f7f7f7; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  table tr:last-child td { border-bottom: none; }
+  table tr:hover td { background: #fafafa; }
+  .alert { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 12px; }
+  .alert-success { background: #f6ffed; border: 1px solid #b7eb8f; color: #389e0d; }
+  .alert-error { background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322; }
+  .alert-info { background: #e6f4ff; border: 1px solid #91caff; color: #0958d9; }
+  .progress-bar { background: #f0f0f0; border-radius: 4px; height: 6px; overflow: hidden; margin-top: 10px; }
+  .progress-bar-fill { height: 100%; background: #1677ff; border-radius: 4px; transition: width .3s; }
+  .section-gap { margin-bottom: 8px; }
+  .inline-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .stats-row { display: flex; gap: 16px; margin-bottom: 12px; }
+  .stats-item { font-size: 14px; }
+  #configToggle { cursor: pointer; color: #1677ff; font-size: 13px; margin-left: 12px; user-select: none; }
+  #configBody { display: none; }
+  .config-open #configBody { display: block; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>大航海素材工具</h1>
+
+  <!-- 设置 -->
+  <div class="card" id="configCard">
+    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>设置（凭证配置）</span>
+      <span id="configToggle" onclick="toggleConfig()">展开 ▼</span>
+    </div>
+    <div id="configBody">
+      <div class="alert alert-info section-gap">
+        请将浏览器中大航海页面的 Cookie 和 _csrf 填入此处，工具会保存到本地 config.json。
+      </div>
+      <div class="form-row">
+        <span class="form-label required">CSRF Token</span>
+        <input id="inputCsrf" class="form-control" placeholder="请输入 _csrf 值" />
+      </div>
+      <div class="form-row">
+        <span class="form-label required">Cookie</span>
+        <textarea id="inputCookie" class="form-control" style="max-width:600px;height:80px;" placeholder="请粘贴完整 Cookie 字符串"></textarea>
+      </div>
+      <div class="form-row">
+        <span class="form-label"></span>
+        <button class="btn btn-primary" onclick="saveConfig()">保存配置</button>
+        <span id="configMsg" class="hint"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 配置参数 -->
+  <div class="card" id="paramCard">
+    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>配置参数</span>
+      <button class="btn btn-default" id="btnRefresh" onclick="loadFormInfo()" style="height:28px;font-size:13px;">刷新选项</button>
+    </div>
+    <div id="formInfoLoading" class="alert alert-info" style="display:none;">正在加载选项数据…</div>
+    <div id="formInfoError" class="alert alert-error" style="display:none;"></div>
+
+    <div class="form-row">
+      <span class="form-label">入审类型</span>
+      <span style="line-height:32px;">素材</span>
+    </div>
+    <div class="form-row">
+      <span class="form-label">APP</span>
+      <select id="selApp" class="form-control"><option value="">请选择 APP</option></select>
+    </div>
+    <div class="form-row">
+      <span class="form-label">任务类型</span>
+      <select id="selTaskType" class="form-control"><option value="">请选择任务类型</option></select>
+    </div>
+    <div class="form-row">
+      <span class="form-label">广告类型</span>
+      <select id="selAdType" class="form-control"><option value="">请选择广告类型</option></select>
+    </div>
+    <div class="form-row">
+      <span class="form-label">素材卖点</span>
+      <select id="selScenarioType" class="form-control"><option value="">请选择素材卖点</option></select>
+    </div>
+    <div class="form-row">
+      <span class="form-label">关联商品库/承接页面</span>
+      <select id="selBizType" class="form-control"><option value="">请选择</option></select>
+    </div>
+    <div class="form-row">
+      <span class="form-label">热点事件</span>
+      <select id="selHotEvent" class="form-control"><option value="">请选择热点事件</option></select>
+    </div>
+    <div class="form-row">
+      <span class="form-label">底图类型</span>
+      <select id="selBaseImageType" class="form-control"><option value="">请选择底图类型</option></select>
+    </div>
+    <div class="form-row">
+      <span class="form-label">自定义标题</span>
+      <input id="inputTitle" class="form-control" placeholder="请输入自定义标题" />
+    </div>
+    <div class="form-row">
+      <span class="form-label">自定义文案</span>
+      <input id="inputCopy" class="form-control" placeholder="请输入自定义文案" />
+    </div>
+  </div>
+
+  <!-- 上传素材 -->
+  <div class="card">
+    <div class="card-title">上传素材</div>
+    <input type="file" id="folderInput" multiple webkitdirectory style="display:none" onchange="onFolderChange(event)" />
+    <div class="inline-row">
+      <button class="btn btn-default" id="btnFolder" onclick="document.getElementById('folderInput').click()">
+        选择文件夹
+      </button>
+      <span id="uploadStatus" class="hint"></span>
+    </div>
+    <div id="uploadProgressWrap" style="display:none;margin-top:12px;">
+      <span id="uploadProgressText" class="hint"></span>
+      <div class="progress-bar" style="margin-top:6px;max-width:400px;">
+        <div id="uploadProgressFill" class="progress-bar-fill" style="width:0%"></div>
+      </div>
+    </div>
+    <div id="uploadError" class="alert alert-error" style="display:none;margin-top:12px;"></div>
+    <div class="hint" style="margin-top:10px;">支持格式：mp4 / mov / avi / jpg / jpeg / png / gif / webp，建议使用 Chrome 浏览器</div>
+  </div>
+
+  <!-- 素材列表 -->
+  <div class="card" id="metaCard" style="display:none;">
+    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+      <span>素材列表 <span id="metaCount" class="hint"></span></span>
+      <button class="btn btn-success" id="btnSubmit" onclick="submitMaterials()">提交审核</button>
+    </div>
+    <div id="submitLoading" class="alert alert-info" style="display:none;">正在提交审核…</div>
+    <div style="overflow-x:auto;">
+      <table id="metaTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>文件名</th>
+            <th>素材地址</th>
+            <th>materialCode</th>
+          </tr>
+        </thead>
+        <tbody id="metaTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 提交结果 -->
+  <div class="card" id="resultCard" style="display:none;">
+    <div class="card-title">提交结果</div>
+    <div class="stats-row">
+      <div class="stats-item">成功：<span class="tag tag-success" id="resSuccess">0</span></div>
+      <div class="stats-item">失败：<span class="tag tag-error" id="resFail">0</span></div>
+    </div>
+    <div id="failTableWrap" style="display:none;overflow-x:auto;">
+      <table>
+        <thead>
+          <tr><th>文件名</th><th>materialCode</th><th>素材地址</th><th>错误信息</th></tr>
+        </thead>
+        <tbody id="failTbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- 状态 ----------
+let allMetaList = [];
+
+// ---------- 设置 ----------
+function toggleConfig() {
+  const card = document.getElementById('configCard');
+  const btn = document.getElementById('configToggle');
+  if (card.classList.contains('config-open')) {
+    card.classList.remove('config-open');
+    btn.textContent = '展开 ▼';
+  } else {
+    card.classList.add('config-open');
+    btn.textContent = '收起 ▲';
+  }
+}
+
+async function loadConfig() {
+  try {
+    const res = await fetch('/api/config');
+    const json = await res.json();
+    if (json.code === 0 && json.data) {
+      document.getElementById('inputCsrf').value = json.data.csrf || '';
+      document.getElementById('inputCookie').value = json.data.cookie || '';
+      if (json.data.csrf && json.data.cookie) {
+        // 已配置则不自动展开
+      } else {
+        // 未配置则展开引导用户填写
+        document.getElementById('configCard').classList.add('config-open');
+        document.getElementById('configToggle').textContent = '收起 ▲';
+      }
+    }
+  } catch (e) {
+    console.error('loadConfig error', e);
+  }
+}
+
+async function saveConfig() {
+  const csrf = document.getElementById('inputCsrf').value.trim();
+  const cookie = document.getElementById('inputCookie').value.trim();
+  const msg = document.getElementById('configMsg');
+  if (!csrf || !cookie) {
+    msg.textContent = '请填写 CSRF 和 Cookie';
+    msg.style.color = '#ff4d4f';
+    return;
+  }
+  try {
+    const res = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ csrf, cookie }),
+    });
+    const json = await res.json();
+    if (json.code === 0) {
+      msg.textContent = '保存成功 ✓';
+      msg.style.color = '#52c41a';
+      setTimeout(() => { msg.textContent = ''; }, 3000);
+      // 收起并刷新选项
+      document.getElementById('configCard').classList.remove('config-open');
+      document.getElementById('configToggle').textContent = '展开 ▼';
+      loadFormInfo();
+    } else {
+      msg.textContent = json.message || '保存失败';
+      msg.style.color = '#ff4d4f';
+    }
+  } catch (e) {
+    msg.textContent = '保存失败: ' + e.message;
+    msg.style.color = '#ff4d4f';
+  }
+}
+
+// ---------- 表单选项 ----------
+function buildOptions(sel, list, defaultText, autoSelect) {
+  sel.innerHTML = `<option value="">${defaultText}</option>`;
+  (list || []).forEach(item => {
+    const opt = document.createElement('option');
+    opt.value = item.id;
+    opt.textContent = item.name;
+    sel.appendChild(opt);
+  });
+  if (autoSelect) {
+    const found = (list || []).find(i => i.name === autoSelect);
+    if (found) sel.value = String(found.id);
+  }
+}
+
+async function loadFormInfo() {
+  const loadEl = document.getElementById('formInfoLoading');
+  const errEl = document.getElementById('formInfoError');
+  const btnRefresh = document.getElementById('btnRefresh');
+  loadEl.style.display = 'block';
+  errEl.style.display = 'none';
+  btnRefresh.disabled = true;
+
+  try {
+    const res = await fetch('/api/forminfo');
+    const json = await res.json();
+    if (json.code !== 0) {
+      errEl.textContent = json.message || '加载失败';
+      errEl.style.display = 'block';
+      return;
+    }
+    // forminfo 返回 { data: { data: { apps, taskTypes, ... } } } 或 { data: { apps, ... } }
+    const raw = json.data;
+    const d = raw?.data || raw || {};
+
+    buildOptions(document.getElementById('selApp'), d.apps, '请选择 APP', '淘宝');
+    buildOptions(document.getElementById('selTaskType'), d.taskTypes, '请选择任务类型', '拉新');
+    buildOptions(document.getElementById('selAdType'), d.adTypes, '请选择广告类型', '线上硬广');
+    buildOptions(document.getElementById('selScenarioType'), d.scenarioTypes, '请选择素材卖点', '商品');
+    buildOptions(document.getElementById('selBizType'), d.taoBizChannels, '请选择');
+    buildOptions(document.getElementById('selHotEvent'), d.hotEvents, '请选择热点事件', '通用');
+    buildOptions(document.getElementById('selBaseImageType'), d.baseImageTypes, '请选择底图类型', '带logo成品图');
+  } catch (e) {
+    errEl.textContent = '加载失败: ' + e.message;
+    errEl.style.display = 'block';
+  } finally {
+    loadEl.style.display = 'none';
+    btnRefresh.disabled = false;
+  }
+}
+
+// ---------- 文件夹上传 ----------
+const ALLOWED_EXT = new Set(['mp4', 'mov', 'avi', 'jpg', 'jpeg', 'png', 'gif', 'webp']);
+
+function onFolderChange(e) {
+  const files = Array.from(e.target.files || []).filter(f => {
+    const ext = f.name.split('.').pop()?.toLowerCase() || '';
+    return ALLOWED_EXT.has(ext);
+  });
+  if (!files.length) {
+    showUploadError('文件夹中没有支持的素材格式（mp4/mov/avi/jpg/jpeg/png/gif/webp）');
+    e.target.value = '';
+    return;
+  }
+  uploadInChunks(files);
+  e.target.value = '';
+}
+
+function showUploadError(msg) {
+  const el = document.getElementById('uploadError');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+async function uploadInChunks(files) {
+  const btnFolder = document.getElementById('btnFolder');
+  const statusEl = document.getElementById('uploadStatus');
+  const progressWrap = document.getElementById('uploadProgressWrap');
+  const progressText = document.getElementById('uploadProgressText');
+  const progressFill = document.getElementById('uploadProgressFill');
+  const errEl = document.getElementById('uploadError');
+
+  btnFolder.disabled = true;
+  errEl.style.display = 'none';
+  allMetaList = [];
+
+  const total = Math.ceil(files.length / 10);
+  progressWrap.style.display = 'block';
+  statusEl.textContent = '';
+
+  for (let i = 0; i < files.length; i += 10) {
+    const chunk = files.slice(i, i + 10);
+    const batchIdx = Math.floor(i / 10) + 1;
+    progressText.textContent = `正在上传第 ${batchIdx} / ${total} 批（本批 ${chunk.length} 个文件）…`;
+    progressFill.style.width = ((batchIdx - 1) / total * 100) + '%';
+
+    const formData = new FormData();
+    chunk.forEach(f => formData.append('files[]', f));
+
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const json = await res.json();
+      if (json.code === 0 && Array.isArray(json.data?.metaList)) {
+        allMetaList.push(...json.data.metaList);
+      } else if (json.code !== 0) {
+        console.warn('batch failed:', json.message);
+      }
+    } catch (e) {
+      console.warn('batch error:', e);
+    }
+  }
+
+  progressFill.style.width = '100%';
+  progressText.textContent = '上传完成';
+  btnFolder.disabled = false;
+
+  if (allMetaList.length) {
+    statusEl.textContent = `共获取 ${allMetaList.length} 个素材`;
+    renderMetaTable();
+    document.getElementById('metaCard').style.display = 'block';
+    document.getElementById('resultCard').style.display = 'none';
+  } else {
+    showUploadError('上传完成，但未获取到任何素材，请检查文件格式或凭证配置');
+    document.getElementById('metaCard').style.display = 'none';
+  }
+}
+
+function renderMetaTable() {
+  const tbody = document.getElementById('metaTbody');
+  document.getElementById('metaCount').textContent = `共 ${allMetaList.length} 个`;
+  tbody.innerHTML = allMetaList.map((item, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td title="${esc(item.fileName)}">${esc(item.fileName)}</td>
+      <td title="${esc(item.materialUrl)}"><a href="${esc(item.materialUrl)}" target="_blank" style="color:#1677ff;">${esc(item.materialUrl)}</a></td>
+      <td>${esc(item.materialCode)}</td>
+    </tr>
+  `).join('');
+}
+
+// ---------- 提交审核 ----------
+async function submitMaterials() {
+  if (!allMetaList.length) {
+    alert('请先选择文件夹上传素材');
+    return;
+  }
+  const btnSubmit = document.getElementById('btnSubmit');
+  const loadEl = document.getElementById('submitLoading');
+  btnSubmit.disabled = true;
+  loadEl.style.display = 'block';
+
+  const payload = {
+    metaList: allMetaList,
+    appId: String(document.getElementById('selApp').value),
+    taskType: String(document.getElementById('selTaskType').value),
+    adType: String(document.getElementById('selAdType').value),
+    scenarioType: String(document.getElementById('selScenarioType').value),
+    hotEvent: String(document.getElementById('selHotEvent').value),
+    baseImageType: String(document.getElementById('selBaseImageType').value),
+    bizType: String(document.getElementById('selBizType').value),
+    customTitle: document.getElementById('inputTitle').value,
+    customCopy: document.getElementById('inputCopy').value,
+    scenarioTypeDesc: '',
+    bizTypeDesc: '',
+  };
+
+  try {
+    const res = await fetch('/api/material-create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (json.code === 0 && json.data) {
+      renderResult(json.data);
+    } else {
+      alert('提交失败: ' + (json.message || '未知错误'));
+    }
+  } catch (e) {
+    alert('提交请求失败: ' + e.message);
+  } finally {
+    btnSubmit.disabled = false;
+    loadEl.style.display = 'none';
+  }
+}
+
+function renderResult(data) {
+  document.getElementById('resSuccess').textContent = data.successCount ?? 0;
+  document.getElementById('resFail').textContent = data.failCount ?? 0;
+
+  const failWrap = document.getElementById('failTableWrap');
+  const failTbody = document.getElementById('failTbody');
+  if (data.failList && data.failList.length) {
+    failWrap.style.display = 'block';
+    failTbody.innerHTML = data.failList.map(item => `
+      <tr>
+        <td title="${esc(item.fileName)}">${esc(item.fileName)}</td>
+        <td>${esc(item.materialCode)}</td>
+        <td title="${esc(item.materialUrl)}">${esc(item.materialUrl)}</td>
+        <td style="color:#ff4d4f;">${esc(item.errorMessage)}</td>
+      </tr>
+    `).join('');
+  } else {
+    failWrap.style.display = 'none';
+  }
+
+  document.getElementById('resultCard').style.display = 'block';
+  document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth' });
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ---------- 初始化 ----------
+window.addEventListener('DOMContentLoaded', async () => {
+  await loadConfig();
+  loadFormInfo();
+});
+</script>
+</body>
+</html>
