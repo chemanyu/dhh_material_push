@@ -103,7 +103,7 @@ func logCurlPost(reqURL string, headers map[string]string, params url.Values, ur
 		sb.WriteString(fmt.Sprintf("  --data-raw '%s' \\\n", encodeParams(params)))
 	}
 	sb.WriteString(fmt.Sprintf("  '%s'", reqURL))
-	log.Printf("[CURL]\n%s", sb.String())
+	//log.Printf("[CURL]\n%s", sb.String())
 }
 
 func dhhGet(path, csrf, cookie string) (map[string]interface{}, error) {
@@ -173,7 +173,8 @@ func dhhPost(path, csrf, cookie string, params url.Values, encode bool) (map[str
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("[POST] %s -> %d | body: %s", path, resp.StatusCode, string(body))
+	//log.Printf("[POST] %s -> %d | body: %s", path, resp.StatusCode, string(body))
+	log.Printf("[POST] %s -> %d", path, resp.StatusCode)
 
 	var result map[string]interface{}
 	if err := json.Unmarshal(body, &result); err != nil {
@@ -329,7 +330,7 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 				item.MaterialCode = "重复文件"
 			}
 			metaList = append(metaList, item)
-			log.Printf("[upload] success: %s -> %s", item.FileName, item.MaterialCode)
+			//log.Printf("[upload] success: %s -> %s", item.FileName, item.MaterialCode)
 		} else {
 			log.Printf("[upload] meta/add no data for: %s resp: %v", fh.Filename, metaResp)
 		}

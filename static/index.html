@@ -48,6 +48,14 @@
   .inline-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .stats-row { display: flex; gap: 16px; margin-bottom: 12px; }
   .stats-item { font-size: 14px; }
+  .searchable-select { position: relative; max-width: 400px; width: 100%; }
+  .searchable-dropdown { display: none; position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #d9d9d9; border-top: none; border-radius: 0 0 6px 6px; max-height: 240px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+  .searchable-dropdown.open { display: block; }
+  .searchable-option { padding: 7px 12px; cursor: pointer; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .searchable-option:hover { background: #e6f4ff; }
+  .searchable-option.selected { background: #e6f4ff; color: #1677ff; font-weight: 600; }
+  .searchable-option.no-result { color: #999; cursor: default; }
+  .searchable-input.has-value { border-color: #1677ff; }
   #configToggle { cursor: pointer; color: #1677ff; font-size: 13px; margin-left: 12px; user-select: none; }
 </style>
 </head>
@@ -86,7 +94,11 @@
     </div>
     <div class="form-row">
       <span class="form-label">关联商品库/承接页面</span>
-      <select id="selBizType" class="form-control"><option value="">请选择</option></select>
+      <div class="searchable-select" id="bizTypeSelect">
+        <input type="text" class="form-control searchable-input" id="bizTypeInput" placeholder="输入关键字搜索…" autocomplete="off" />
+        <div class="searchable-dropdown" id="bizTypeDropdown"></div>
+        <input type="hidden" id="selBizType" />
+      </div>
     </div>
     <div class="form-row">
       <span class="form-label">热点事件</span>
@@ -186,6 +198,70 @@
 // ---------- 状态 ----------
 let allMetaList = [];
 
+// ---------- 搜索下拉组件 ----------
+let bizTypeOptions = []; // { id, name }
+
+function initSearchableSelect() {
+  const input = document.getElementById('bizTypeInput');
+  const dropdown = document.getElementById('bizTypeDropdown');
+  const hidden = document.getElementById('selBizType');
+
+  function renderDropdown(keyword) {
+    const kw = (keyword || '').trim().toLowerCase();
+    const filtered = kw
+      ? bizTypeOptions.filter(o => o.name.toLowerCase().includes(kw))
+      : bizTypeOptions;
+    if (!filtered.length) {
+      dropdown.innerHTML = '<div class="searchable-option no-result">无匹配结果</div>';
+      return;
+    }
+    const currentId = hidden.value;
+    dropdown.innerHTML = filtered.map(o => `
+      <div class="searchable-option${o.id == currentId ? ' selected' : ''}"
+           data-id="${esc(String(o.id))}" data-name="${esc(o.name)}">
+        ${esc(o.name)}
+      </div>
+    `).join('');
+  }
+
+  input.addEventListener('focus', () => {
+    renderDropdown(input.value);
+    dropdown.classList.add('open');
+  });
+
+  input.addEventListener('input', () => {
+    hidden.value = '';
+    input.classList.remove('has-value');
+    renderDropdown(input.value);
+    dropdown.classList.add('open');
+  });
+
+  dropdown.addEventListener('mousedown', e => {
+    const opt = e.target.closest('.searchable-option');
+    if (!opt || opt.classList.contains('no-result')) return;
+    hidden.value = opt.dataset.id;
+    input.value = opt.dataset.name;
+    input.classList.add('has-value');
+    dropdown.classList.remove('open');
+  });
+
+  document.addEventListener('click', e => {
+    if (!document.getElementById('bizTypeSelect').contains(e.target)) {
+      dropdown.classList.remove('open');
+      // 若输入框内容和已选项不符则清空
+      if (hidden.value === '') input.value = '';
+    }
+  });
+}
+
+function setBizTypeOptions(list) {
+  bizTypeOptions = (list || []).map(o => ({ id: String(o.id), name: o.name }));
+  // 重置
+  document.getElementById('selBizType').value = '';
+  document.getElementById('bizTypeInput').value = '';
+  document.getElementById('bizTypeInput').classList.remove('has-value');
+}
+
 // ---------- 表单选项 ----------
 function buildOptions(sel, list, defaultText, autoSelect) {
   sel.innerHTML = `<option value="">${defaultText}</option>`;
@@ -225,7 +301,7 @@ async function loadFormInfo() {
     buildOptions(document.getElementById('selTaskType'), d.taskTypes, '请选择任务类型', '拉新');
     buildOptions(document.getElementById('selAdType'), d.adTypes, '请选择广告类型', '线上硬广');
     buildOptions(document.getElementById('selScenarioType'), d.scenarioTypes, '请选择素材卖点', '商品');
-    buildOptions(document.getElementById('selBizType'), d.taoBizChannels, '请选择');
+    setBizTypeOptions(d.taoBizChannels);
     buildOptions(document.getElementById('selHotEvent'), d.hotEvents, '请选择热点事件', '通用');
     buildOptions(document.getElementById('selBaseImageType'), d.baseImageTypes, '请选择底图类型', '带logo成品图');
   } catch (e) {
@@ -419,6 +495,7 @@ function esc(s) {
 
 // ---------- 初始化 ----------
 window.addEventListener('DOMContentLoaded', () => {
+  initSearchableSelect();
   loadFormInfo();
 });
 </script>

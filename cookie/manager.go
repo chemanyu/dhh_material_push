@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	//CookieAPIURL     = "https://rta.zhltech.net/guangyixinmedia/report/dhh/cookie"
-	CookieAPIURL     = "http://127.0.0.1:8888/report/dhh/cookie"
+	CookieAPIURL = "https://rta.zhltech.net/guangyixinmedia/report/dhh/cookie"
+	//CookieAPIURL     = "http://127.0.0.1:8888/report/dhh/cookie"
 	RefreshInterval  = 1 * time.Minute  // 每30分钟刷新一次
 	InitialRetryWait = 10 * time.Second // 初始重试等待时间
 )
@@ -65,7 +65,7 @@ func (m *Manager) fetchCookie() error {
 	if err != nil {
 		return fmt.Errorf("创建请求失败: %w", err)
 	}
-	//req.SetBasicAuth("guangyixin", "*~je,R#(anqAD")
+	req.SetBasicAuth("guangyixin", "*~je,R#(anqAD")
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
