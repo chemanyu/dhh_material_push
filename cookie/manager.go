@@ -13,7 +13,7 @@ import (
 const (
 	CookieAPIURL = "https://rta.zhltech.net/guangyixinmedia/report/dhh/cookie"
 	//CookieAPIURL     = "http://127.0.0.1:8888/report/dhh/cookie"
-	RefreshInterval  = 1 * time.Minute  // 每30分钟刷新一次
+	RefreshInterval  = 30 * time.Minute // 每30分钟刷新一次
 	InitialRetryWait = 10 * time.Second // 初始重试等待时间
 )
 

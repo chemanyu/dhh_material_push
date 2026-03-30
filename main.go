@@ -80,7 +80,7 @@ func logCurlGet(reqURL string, headers map[string]string) {
 		sb.WriteString(fmt.Sprintf("  -H '%s: %s' \\\n", k, v))
 	}
 	sb.WriteString(fmt.Sprintf("  '%s'", reqURL))
-	log.Printf("[CURL]\n%s", sb.String())
+	//log.Printf("[CURL]\n%s", sb.String())
 }
 
 // logCurlPost 打印等效 curl 命令。
