@@ -49,39 +49,11 @@
   .stats-row { display: flex; gap: 16px; margin-bottom: 12px; }
   .stats-item { font-size: 14px; }
   #configToggle { cursor: pointer; color: #1677ff; font-size: 13px; margin-left: 12px; user-select: none; }
-  #configBody { display: none; }
-  .config-open #configBody { display: block; }
 </style>
 </head>
 <body>
 <div class="container">
   <h1>大航海素材工具</h1>
-
-  <!-- 设置 -->
-  <div class="card" id="configCard">
-    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
-      <span>设置（凭证配置）</span>
-      <span id="configToggle" onclick="toggleConfig()">展开 ▼</span>
-    </div>
-    <div id="configBody">
-      <div class="alert alert-info section-gap">
-        请将浏览器中大航海页面的 Cookie 和 _csrf 填入此处，工具会保存到本地 config.json。
-      </div>
-      <div class="form-row">
-        <span class="form-label required">CSRF Token</span>
-        <input id="inputCsrf" class="form-control" placeholder="请输入 _csrf 值" />
-      </div>
-      <div class="form-row">
-        <span class="form-label required">Cookie</span>
-        <textarea id="inputCookie" class="form-control" style="max-width:600px;height:80px;" placeholder="请粘贴完整 Cookie 字符串"></textarea>
-      </div>
-      <div class="form-row">
-        <span class="form-label"></span>
-        <button class="btn btn-primary" onclick="saveConfig()">保存配置</button>
-        <span id="configMsg" class="hint"></span>
-      </div>
-    </div>
-  </div>
 
   <!-- 配置参数 -->
   <div class="card" id="paramCard">
@@ -197,73 +169,6 @@
 <script>
 // ---------- 状态 ----------
 let allMetaList = [];
-
-// ---------- 设置 ----------
-function toggleConfig() {
-  const card = document.getElementById('configCard');
-  const btn = document.getElementById('configToggle');
-  if (card.classList.contains('config-open')) {
-    card.classList.remove('config-open');
-    btn.textContent = '展开 ▼';
-  } else {
-    card.classList.add('config-open');
-    btn.textContent = '收起 ▲';
-  }
-}
-
-async function loadConfig() {
-  try {
-    const res = await fetch('/api/config');
-    const json = await res.json();
-    if (json.code === 0 && json.data) {
-      document.getElementById('inputCsrf').value = json.data.csrf || '';
-      document.getElementById('inputCookie').value = json.data.cookie || '';
-      if (json.data.csrf && json.data.cookie) {
-        // 已配置则不自动展开
-      } else {
-        // 未配置则展开引导用户填写
-        document.getElementById('configCard').classList.add('config-open');
-        document.getElementById('configToggle').textContent = '收起 ▲';
-      }
-    }
-  } catch (e) {
-    console.error('loadConfig error', e);
-  }
-}
-
-async function saveConfig() {
-  const csrf = document.getElementById('inputCsrf').value.trim();
-  const cookie = document.getElementById('inputCookie').value.trim();
-  const msg = document.getElementById('configMsg');
-  if (!csrf || !cookie) {
-    msg.textContent = '请填写 CSRF 和 Cookie';
-    msg.style.color = '#ff4d4f';
-    return;
-  }
-  try {
-    const res = await fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ csrf, cookie }),
-    });
-    const json = await res.json();
-    if (json.code === 0) {
-      msg.textContent = '保存成功 ✓';
-      msg.style.color = '#52c41a';
-      setTimeout(() => { msg.textContent = ''; }, 3000);
-      // 收起并刷新选项
-      document.getElementById('configCard').classList.remove('config-open');
-      document.getElementById('configToggle').textContent = '展开 ▼';
-      loadFormInfo();
-    } else {
-      msg.textContent = json.message || '保存失败';
-      msg.style.color = '#ff4d4f';
-    }
-  } catch (e) {
-    msg.textContent = '保存失败: ' + e.message;
-    msg.style.color = '#ff4d4f';
-  }
-}
 
 // ---------- 表单选项 ----------
 function buildOptions(sel, list, defaultText, autoSelect) {
@@ -480,8 +385,7 @@ function esc(s) {
 }
 
 // ---------- 初始化 ----------
-window.addEventListener('DOMContentLoaded', async () => {
-  await loadConfig();
+window.addEventListener('DOMContentLoaded', () => {
   loadFormInfo();
 });
 </script>

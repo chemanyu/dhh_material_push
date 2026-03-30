@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/rand"
+	"dhh-material-tool/cookie"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -12,7 +13,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -27,43 +27,7 @@ var indexHTML []byte
 
 const dhhBaseURL = "https://dhh.taobao.com"
 
-// Config 存储大航海凭证，保存在可执行文件同目录的 config.json 中
-type Config struct {
-	CSRF   string `json:"csrf"`
-	Cookie string `json:"cookie"`
-}
-
-func getConfigPath() string {
-	exe, err := os.Executable()
-	if err != nil {
-		return "config.json"
-	}
-	// 开发时 os.Executable 可能返回临时路径，优先用当前目录
-	if _, err := os.Stat("config.json"); err == nil {
-		return "config.json"
-	}
-	return filepath.Join(filepath.Dir(exe), "config.json")
-}
-
-func loadConfig() (*Config, error) {
-	data, err := os.ReadFile(getConfigPath())
-	if err != nil {
-		return &Config{}, nil
-	}
-	var cfg Config
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return &Config{}, nil
-	}
-	return &cfg, nil
-}
-
-func saveConfig(cfg *Config) error {
-	data, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(getConfigPath(), data, 0600)
-}
+var cookieMgr *cookie.Manager
 
 // MetaItem 上传素材后得到的元数据
 type MetaItem struct {
@@ -100,12 +64,8 @@ type FailItem struct {
 
 func buildDhhHeaders(csrf, cookie string) map[string]string {
 	return map[string]string{
-		"accept":          "application/json, text/plain, */*",
+		"accept":          "*/*",
 		"accept-language": "zh-CN,zh;q=0.9",
-		"bx-v":            "2.5.36",
-		"origin":          "https://dhh.taobao.com",
-		"referer":         "https://dhh.taobao.com/",
-		"user-agent":      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
 		"x-xsrf-token":    csrf,
 		"Cookie":          cookie,
 	}
@@ -113,15 +73,50 @@ func buildDhhHeaders(csrf, cookie string) map[string]string {
 
 var httpClient = &http.Client{Timeout: 60 * time.Second}
 
+func logCurlGet(reqURL string, headers map[string]string) {
+	var sb strings.Builder
+	sb.WriteString("curl -X GET \\\n")
+	for k, v := range headers {
+		sb.WriteString(fmt.Sprintf("  -H '%s: %s' \\\n", k, v))
+	}
+	sb.WriteString(fmt.Sprintf("  '%s'", reqURL))
+	log.Printf("[CURL]\n%s", sb.String())
+}
+
+// logCurlPost 打印等效 curl 命令。
+// urlencode=true  → --data-urlencode 'k=明文v'（对应 material/create）
+// urlencode=false → --data-raw '已编码body'（对应 meta/add 等）
+func logCurlPost(reqURL string, headers map[string]string, params url.Values, urlencode bool) {
+	var sb strings.Builder
+	sb.WriteString("curl \\\n")
+	for k, v := range headers {
+		sb.WriteString(fmt.Sprintf("  -H '%s: %s' \\\n", k, v))
+	}
+	sb.WriteString("  -H 'content-type: application/x-www-form-urlencoded' \\\n")
+	if urlencode {
+		for k, vs := range params {
+			for _, v := range vs {
+				sb.WriteString(fmt.Sprintf("  --data-urlencode '%s=%s' \\\n", k, v))
+			}
+		}
+	} else {
+		sb.WriteString(fmt.Sprintf("  --data-raw '%s' \\\n", encodeParams(params)))
+	}
+	sb.WriteString(fmt.Sprintf("  '%s'", reqURL))
+	log.Printf("[CURL]\n%s", sb.String())
+}
+
 func dhhGet(path, csrf, cookie string) (map[string]interface{}, error) {
 	reqURL := dhhBaseURL + path + "?_csrf=" + url.QueryEscape(csrf)
 	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
 		return nil, err
 	}
-	for k, v := range buildDhhHeaders(csrf, cookie) {
+	headers := buildDhhHeaders(csrf, cookie)
+	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
+	logCurlGet(reqURL, headers)
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -139,15 +134,32 @@ func dhhGet(path, csrf, cookie string) (map[string]interface{}, error) {
 	return result, nil
 }
 
-func dhhPost(path, csrf, cookie string, params url.Values) (map[string]interface{}, error) {
+// encodeParams 模拟 curl --data-urlencode：使用 RFC 3986 percent-encoding（%20 而非 +）
+func encodeParams(params url.Values) string {
+	var parts []string
+	for k, vs := range params {
+		for _, v := range vs {
+			parts = append(parts, url.QueryEscape(k)+"="+url.QueryEscape(v))
+		}
+	}
+	// url.QueryEscape 仍用 + 代替空格，需替换为 %20
+	result := strings.Join(parts, "&")
+	return strings.ReplaceAll(result, "+", "%20")
+}
+
+func dhhPost(path, csrf, cookie string, params url.Values, encode bool) (map[string]interface{}, error) {
 	reqURL := dhhBaseURL + path
 	params.Set("_csrf", csrf)
 
-	req, err := http.NewRequest("POST", reqURL, strings.NewReader(params.Encode()))
+	headers := buildDhhHeaders(csrf, cookie)
+	logCurlPost(reqURL, headers, params, encode)
+
+	encoded := encodeParams(params)
+	req, err := http.NewRequest("POST", reqURL, strings.NewReader(encoded))
 	if err != nil {
 		return nil, err
 	}
-	for k, v := range buildDhhHeaders(csrf, cookie) {
+	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
 	req.Header.Set("content-type", "application/x-www-form-urlencoded")
@@ -208,34 +220,13 @@ func handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.Write(indexHTML)
 }
 
-func handleConfig(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		cfg, _ := loadConfig()
-		jsonOK(w, cfg)
-	case http.MethodPost:
-		var cfg Config
-		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
-			jsonErr(w, err.Error())
-			return
-		}
-		if err := saveConfig(&cfg); err != nil {
-			jsonErr(w, err.Error())
-			return
-		}
-		jsonOK(w, "ok")
-	default:
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-	}
-}
-
 func handleFormInfo(w http.ResponseWriter, r *http.Request) {
-	cfg, _ := loadConfig()
-	if cfg.CSRF == "" || cfg.Cookie == "" {
-		jsonErr(w, "请先在【设置】中填写 CSRF 和 Cookie")
+	ck, csrf, err := cookieMgr.GetCredentials()
+	if err != nil {
+		jsonErr(w, "凭证未就绪: "+err.Error())
 		return
 	}
-	result, err := dhhGet("/polystar/api/creative/material/forminfo", cfg.CSRF, cfg.Cookie)
+	result, err := dhhGet("/polystar/api/creative/material/forminfo", csrf, ck)
 	if err != nil {
 		log.Printf("[forminfo] error: %v", err)
 		jsonErr(w, err.Error())
@@ -245,9 +236,9 @@ func handleFormInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleUpload(w http.ResponseWriter, r *http.Request) {
-	cfg, _ := loadConfig()
-	if cfg.CSRF == "" || cfg.Cookie == "" {
-		jsonErr(w, "请先在【设置】中填写 CSRF 和 Cookie")
+	ck, csrf, err := cookieMgr.GetCredentials()
+	if err != nil {
+		jsonErr(w, "凭证未就绪: "+err.Error())
 		return
 	}
 
@@ -296,7 +287,7 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Step 1: osssign
-		osssignResp, err := dhhGet("/polystar/api/creative/material/osssign", cfg.CSRF, cfg.Cookie)
+		osssignResp, err := dhhGet("/polystar/api/creative/material/osssign", csrf, ck)
 		if err != nil {
 			log.Printf("[upload] osssign error: %s %v", fh.Filename, err)
 			continue
@@ -322,7 +313,7 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 		params.Set("ossUrl", ossURL)
 		params.Set("fileName", fh.Filename)
 
-		metaResp, err := dhhPost("/polystar/api/creative/material/meta/add", cfg.CSRF, cfg.Cookie, params)
+		metaResp, err := dhhPost("/polystar/api/creative/material/meta/add", csrf, ck, params, false)
 		if err != nil {
 			log.Printf("[upload] meta/add error: %s %v", fh.Filename, err)
 			continue
@@ -354,7 +345,6 @@ func uploadToOss(ossData map[string]interface{}, ossKey, fileName string, fileBy
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
 
-	// 按顺序写入字段（OSS 要求 file 字段在最后）
 	orderedFields := []struct{ k, v string }{
 		{"name", fileName},
 		{"key", ossKey},
@@ -370,13 +360,11 @@ func uploadToOss(ossData map[string]interface{}, ossKey, fileName string, fileBy
 		}
 	}
 
-	// 检测 MIME 类型
 	mimeType := mime.TypeByExtension(filepath.Ext(fileName))
 	if mimeType == "" {
 		mimeType = http.DetectContentType(fileBytes)
 	}
 
-	// 创建 file 字段
 	fw, err := mw.CreatePart(map[string][]string{
 		"Content-Disposition": {fmt.Sprintf(`form-data; name="file"; filename="%s"`, fileName)},
 		"Content-Type":        {mimeType},
@@ -416,9 +404,9 @@ func uploadToOss(ossData map[string]interface{}, ossKey, fileName string, fileBy
 }
 
 func handleMaterialCreate(w http.ResponseWriter, r *http.Request) {
-	cfg, _ := loadConfig()
-	if cfg.CSRF == "" || cfg.Cookie == "" {
-		jsonErr(w, "请先在【设置】中填写 CSRF 和 Cookie")
+	ck, csrf, err := cookieMgr.GetCredentials()
+	if err != nil {
+		jsonErr(w, "凭证未就绪: "+err.Error())
 		return
 	}
 
@@ -436,7 +424,6 @@ func handleMaterialCreate(w http.ResponseWriter, r *http.Request) {
 	failCount := 0
 	var failList []FailItem
 
-	// 按每批最多 10 个拆分
 	for i := 0; i < len(req.MetaList); i += 10 {
 		end := i + 10
 		if end > len(req.MetaList) {
@@ -474,7 +461,7 @@ func handleMaterialCreate(w http.ResponseWriter, r *http.Request) {
 		params.Set("bizTypeDesc", req.BizTypeDesc)
 		params.Set("materialList", string(matListJSON))
 
-		result, err := dhhPost("/polystar/api/creative/material/create", cfg.CSRF, cfg.Cookie, params)
+		result, err := dhhPost("/polystar/api/creative/material/create", csrf, ck, params, true)
 		if err != nil {
 			log.Printf("[create] batch %d error: %v", i/10+1, err)
 			failCount += len(batch)
@@ -541,17 +528,18 @@ func openBrowser(addr string) {
 }
 
 func main() {
+	cookieMgr = cookie.NewManager()
+	defer cookieMgr.Stop()
+
 	port := "18080"
 	addr := "http://localhost:" + port
 
 	http.HandleFunc("/", handleIndex)
-	http.HandleFunc("/api/config", handleConfig)
 	http.HandleFunc("/api/forminfo", handleFormInfo)
 	http.HandleFunc("/api/upload", handleUpload)
 	http.HandleFunc("/api/material-create", handleMaterialCreate)
 
 	log.Printf("大航海素材工具已启动: %s", addr)
-	log.Printf("如浏览器未自动打开，请手动访问上方地址")
 
 	go func() {
 		time.Sleep(600 * time.Millisecond)
