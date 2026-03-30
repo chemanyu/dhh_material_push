@@ -325,6 +325,9 @@ func handleUpload(w http.ResponseWriter, r *http.Request) {
 				MaterialURL:  strVal(data["materialUrl"], ""),
 				MaterialCode: strVal(data["materialCode"], ""),
 			}
+			if data["duplicate"] == true {
+				item.MaterialCode = "重复文件"
+			}
 			metaList = append(metaList, item)
 			log.Printf("[upload] success: %s -> %s", item.FileName, item.MaterialCode)
 		} else {
@@ -422,6 +425,7 @@ func handleMaterialCreate(w http.ResponseWriter, r *http.Request) {
 
 	successCount := 0
 	failCount := 0
+	var successList []MetaItem
 	var failList []FailItem
 
 	for i := 0; i < len(req.MetaList); i += 10 {
@@ -477,6 +481,7 @@ func handleMaterialCreate(w http.ResponseWriter, r *http.Request) {
 		successful, _ := result["successful"].(bool)
 		if successful {
 			successCount += len(batch)
+			successList = append(successList, batch...)
 		} else {
 			msg := strVal(result["message"], "提交失败")
 			failCount += len(batch)
@@ -489,12 +494,16 @@ func handleMaterialCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if successList == nil {
+		successList = []MetaItem{}
+	}
 	if failList == nil {
 		failList = []FailItem{}
 	}
 	jsonOK(w, map[string]interface{}{
 		"successCount": successCount,
 		"failCount":    failCount,
+		"successList":  successList,
 		"failList":     failList,
 	})
 }

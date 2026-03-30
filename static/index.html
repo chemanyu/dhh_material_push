@@ -155,13 +155,29 @@
       <div class="stats-item">成功：<span class="tag tag-success" id="resSuccess">0</span></div>
       <div class="stats-item">失败：<span class="tag tag-error" id="resFail">0</span></div>
     </div>
-    <div id="failTableWrap" style="display:none;overflow-x:auto;">
-      <table>
-        <thead>
-          <tr><th>文件名</th><th>materialCode</th><th>素材地址</th><th>错误信息</th></tr>
-        </thead>
-        <tbody id="failTbody"></tbody>
-      </table>
+
+    <div id="successTableWrap" style="display:none;">
+      <div style="font-weight:600;color:#52c41a;margin:12px 0 6px;">成功列表</div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr><th>#</th><th>文件名</th><th>素材地址</th><th>materialCode</th></tr>
+          </thead>
+          <tbody id="successTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="failTableWrap" style="display:none;">
+      <div style="font-weight:600;color:#ff4d4f;margin:12px 0 6px;">失败列表</div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr><th>#</th><th>文件名</th><th>素材地址</th><th>materialCode</th><th>错误信息</th></tr>
+          </thead>
+          <tbody id="failTbody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
@@ -360,15 +376,32 @@ function renderResult(data) {
   document.getElementById('resSuccess').textContent = data.successCount ?? 0;
   document.getElementById('resFail').textContent = data.failCount ?? 0;
 
+  const successWrap = document.getElementById('successTableWrap');
+  const successTbody = document.getElementById('successTbody');
+  if (data.successList && data.successList.length) {
+    successWrap.style.display = 'block';
+    successTbody.innerHTML = data.successList.map((item, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td title="${esc(item.fileName)}">${esc(item.fileName)}</td>
+        <td title="${esc(item.materialUrl)}"><a href="${esc(item.materialUrl)}" target="_blank" style="color:#1677ff;">${esc(item.materialUrl)}</a></td>
+        <td>${esc(item.materialCode)}</td>
+      </tr>
+    `).join('');
+  } else {
+    successWrap.style.display = 'none';
+  }
+
   const failWrap = document.getElementById('failTableWrap');
   const failTbody = document.getElementById('failTbody');
   if (data.failList && data.failList.length) {
     failWrap.style.display = 'block';
-    failTbody.innerHTML = data.failList.map(item => `
+    failTbody.innerHTML = data.failList.map((item, i) => `
       <tr>
+        <td>${i + 1}</td>
         <td title="${esc(item.fileName)}">${esc(item.fileName)}</td>
-        <td>${esc(item.materialCode)}</td>
         <td title="${esc(item.materialUrl)}">${esc(item.materialUrl)}</td>
+        <td>${esc(item.materialCode)}</td>
         <td style="color:#ff4d4f;">${esc(item.errorMessage)}</td>
       </tr>
     `).join('');
